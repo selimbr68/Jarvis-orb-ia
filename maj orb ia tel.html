@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0a0e27">
+<title>JARVIS ORB IA</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.png">
+<style>
+  :root { --bg:#0a0e27; --bg2:#050a1a; --blue:#00a8ff; --blue2:#00d4ff; --text:#e0f7ff;
+          --green:#00ff41; --red:#ff4444; --orange:#ffaa00; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; background:var(--bg); color:var(--text); font-family:Arial, sans-serif; }
+  body { padding:10px; max-width:640px; margin:0 auto; min-height:100vh; }
+  .title { font-size:18px; font-weight:bold; color:var(--blue2); text-align:center; margin:6px 0 2px; }
+  .status { font-size:12px; font-weight:bold; text-align:center; color:var(--red); }
+  .mic { font-size:10px; font-weight:bold; text-align:center; color:var(--orange); min-height:14px; }
+  .chat { height:260px; overflow-y:auto; background:var(--bg2); border-radius:4px; padding:8px; margin:8px 0 4px;
+          font-family:Consolas, Courier, monospace; font-size:13px; white-space:pre-wrap; color:var(--text); }
+  .you { color:var(--blue2); } .info { color:#7fa8c9; } .jarvis { color:var(--text); } .err { color:var(--red); }
+  .entry { width:100%; background:var(--bg2); color:var(--blue2); border:1px solid #1d2a55; padding:10px;
+           font-family:Consolas, monospace; font-size:15px; border-radius:4px; }
+  .row { display:flex; gap:4px; margin:6px 0; }
+  .btn { flex:1; border:0; border-radius:4px; padding:10px 2px; font-size:11px; font-weight:bold; color:var(--bg); }
+  .center { margin-top:10px; text-align:center; }
+  canvas.orb { width:100%; max-width:460px; background:var(--bg2); display:block; margin:0 auto; }
+  .sysinfo { font-family:Consolas, monospace; font-size:11px; color:var(--green); white-space:pre; margin-top:4px; }
+  .right { margin-top:12px; }
+  .camera { width:100%; height:200px; background:var(--bg2); border:1px solid var(--blue);
+            display:flex; align-items:center; justify-content:center; color:var(--blue2); font-size:13px; text-align:center; padding:10px; }
+  .lbl { font-family:Consolas, monospace; font-size:11px; color:var(--text); margin:4px 0; }
+  .wide { width:100%; border:0; border-radius:4px; padding:11px; font-size:12px; font-weight:bold; margin:4px 0; }
+  .stream { width:100%; height:110px; background:var(--bg2); border:1px solid var(--blue);
+            display:flex; align-items:center; justify-content:center; color:var(--blue2); font-size:12px; margin-top:4px; }
+  #lock { display:none; position:fixed; inset:0; background:var(--bg); z-index:20; flex-direction:column;
+          align-items:center; justify-content:center; gap:14px; padding:20px; }
+  #lock h2 { color:var(--red); font-size:26px; margin:0; text-align:center; }
+  #lock .info2 { font-size:12px; color:var(--text); min-height:16px; }
+  #lockPin { width:70%; background:var(--bg2); color:var(--blue2); border:1px solid #1d2a55; padding:12px;
+             font-family:Consolas, monospace; font-size:20px; text-align:center; }
+  #settings { display:none; position:fixed; inset:0; background:rgba(0,0,0,.8); z-index:15;
+              align-items:center; justify-content:center; padding:18px; }
+  #settings > div { background:var(--bg2); border:1px solid var(--blue); padding:16px; border-radius:6px; width:100%; max-width:420px; }
+  #settings label { display:block; margin:10px 0 4px; font-size:12px; color:var(--blue2); }
+  #settings input { width:100%; background:var(--bg); color:var(--blue2); border:1px solid #1d2a55; padding:9px; font-size:14px; }
+  .gear { position:fixed; top:8px; right:8px; background:transparent; border:1px solid var(--blue);
+          color:var(--blue2); border-radius:4px; padding:4px 8px; font-size:12px; }
+</style>
+</head>
+<body>
+<button class="gear" id="btnGear">REGLAGES</button>
+
+<div class="title">JARVIS ORB IA</div>
+<div class="status" id="status">LOCKED</div>
+<div class="mic" id="micLbl"></div>
+
+<div class="chat" id="chat"></div>
+<input class="entry" id="msg" type="text" placeholder="" autocomplete="off">
+<div class="row">
+  <button class="btn" style="background:var(--blue2)" id="btnSend">SEND</button>
+  <button class="btn" style="background:var(--orange)" id="btnMic">MIC</button>
+  <button class="btn" style="background:var(--blue)" id="btnMem">MEMOIRE</button>
+  <button class="btn" style="background:var(--orange)" id="btnConv">CONV</button>
+  <button class="btn" style="background:var(--red);color:var(--text)" id="btnLock">LOCK</button>
+</div>
+
+<div class="center">
+  <canvas class="orb" id="orb" width="460" height="460"></canvas>
+  <div class="sysinfo" id="sysinfo"></div>
+</div>
+
+<div class="right">
+  <video class="camera" id="cam" autoplay playsinline muted style="object-fit:cover;background:var(--bg2)"></video>
+  <button class="wide" style="background:var(--blue2);color:var(--bg)" id="btnCam">CAMERA: OFF</button>
+  <div class="lbl" id="faceLbl">Visage: -</div>
+  <button class="wide" style="background:var(--blue2);color:var(--bg)" id="btnEnroll">ENROLER MON VISAGE</button>
+  <div class="lbl" id="handLbl">Main: -</div>
+  <button class="wide" style="background:var(--green);color:var(--bg)" id="btnShare">STREAM ECRAN: OFF</button>
+  <video id="shareVid" autoplay playsinline muted style="display:none;width:100%;height:160px;background:var(--bg2);border:1px solid var(--blue);object-fit:contain"></video>
+  <div class="lbl" id="shareLbl"></div>
+  <button class="wide" style="background:var(--blue);color:var(--bg)" id="btnHist">HISTORIQUE DES CONVERSATIONS</button>
+  <button class="wide" style="background:var(--orange);color:var(--bg)" id="btnNotif">ACTIVER LES NOTIFICATIONS</button>
+</div>
+
+<div id="lock">
+  <h2>JARVIS VERROUILLE</h2>
+  <div class="info2" id="lockInfo">Entre le code PIN pour continuer.</div>
+  <input id="lockPin" type="password" inputmode="numeric" placeholder="PIN">
+  <button class="btn" style="background:var(--blue2);flex:none;padding:12px 30px" id="btnUnlock">DEVERROUILLER</button>
+</div>
+
+<div id="histModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:16;align-items:center;justify-content:center;padding:18px">
+  <div style="background:var(--bg2);border:1px solid var(--blue);padding:16px;border-radius:6px;width:100%;max-width:420px;max-height:80vh;overflow-y:auto">
+    <div style="color:var(--blue2);font-weight:bold;margin-bottom:8px">HISTORIQUE</div>
+    <div id="histList"></div>
+    <button class="btn" style="background:#333;color:var(--text);width:100%;margin-top:10px" id="btnHistClose">FERMER</button>
+  </div>
+</div>
+<div id="settings">
+  <div>
+    <div style="color:var(--blue2);font-weight:bold;margin-bottom:4px">REGLAGES</div>
+    <label for="sKey">Cle API Gemini</label>
+    <input id="sKey" type="password" placeholder="AIza...">
+    <label for="sModel">Modele</label>
+    <input id="sModel" type="text" value="gemini-2.0-flash">
+    <label for="sPin">Code PIN de verrouillage (vide = pas de PIN)</label>
+    <input id="sPin" type="password" inputmode="numeric">
+    <div class="row" style="margin-top:14px">
+      <button class="btn" style="background:var(--blue2)" id="btnSave">ENREGISTRER</button>
+      <button class="btn" style="background:#333;color:var(--text)" id="btnClose">FERMER</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== Prompt systeme : identique au PC =====
+const SYSTEM_PROMPT =
+  "Tu es JARVIS, l'assistant personnel de Monsieur, dans le style de l'assistant d'Iron Man. " +
+  "Reponds toujours en francais, de facon breve (1 a 3 phrases), polie et un peu britannique. " +
+  "Tes reponses sont lues a voix haute : pas de markdown, pas d'emojis, pas de listes. " +
+  "Tu as un orbe flottant visible sur l'ecran quand ta fenetre est reduite. Si Monsieur te demande de le " +
+  "deplacer ou de le cacher, ou si l'orbe gene ce qu'il fait, termine ta reponse par UNE balise: " +
+  "[ORB:haut-gauche] [ORB:haut-droite] [ORB:bas-gauche] [ORB:bas-droite] [ORB:centre] " +
+  "[ORB:cacher] ou [ORB:montrer]. Sinon n'ecris aucune balise. " +
+  "Si Monsieur te donne une information durable sur lui (gout, projet, personne, habitude, preference), " +
+  "ajoute a la fin de ta reponse UNE balise [MEM:phrase courte resumant l'information]. " +
+  "Jamais de balise MEM pour un mot de passe, un code, une cle, un numero de carte, ni pour une simple question.";
+
+// ===== Etat =====
+const $ = id => document.getElementById(id);
+let cfg = JSON.parse(localStorage.getItem('jarvis_cfg') || '{}');
+let memo = JSON.parse(localStorage.getItem('jarvis_memo') || '[]');
+let history = JSON.parse(localStorage.getItem('jarvis_hist') || '[]');
+let busy = false, speaking = false, locked = true, convMode = false, listening = false;
+let spread = 0, t = 0;
+
+// ===== Chat =====
+function renderMsg(cls, text) {
+  const d = document.createElement('div'); d.className = cls; d.textContent = text;
+  $('chat').appendChild(d); $('chat').scrollTop = $('chat').scrollHeight;
+}
+function add(cls, text) {
+  renderMsg(cls, text);
+  if (cls === 'you' || cls === 'jarvis' || cls === 'err') {
+    if (!curConv.title && cls === 'you') curConv.title = text.replace(/^Toi: /, '').slice(0, 40);
+    curConv.msgs.push({ cls, text });
+    saveConv();
+  }
+}
+
+// ===== Voix (voix du telephone, francais) =====
+function pickVoice() {
+  const v = speechSynthesis.getVoices().filter(x => x.lang.startsWith('fr'));
+  return v.find(x => /male|homme|henri|paul|thomas/i.test(x.name)) || v[0] || null;
+}
+function say(text) {
+  if (!('speechSynthesis' in window)) return;
+  const u = new SpeechSynthesisUtterance(text.replace(/\[(ORB|MEM):[^\]]*\]/g, '').trim());
+  u.lang = 'fr-FR'; u.rate = 1.05; u.voice = pickVoice();
+  u.onstart = () => speaking = true;
+  u.onend = u.onerror = () => { speaking = false; if (convMode) startListen(); };
+  speechSynthesis.speak(u);
+}
+
+// ===== Reponses locales (heure / date) =====
+const JOURS = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+const MOIS = ['janvier','fevrier','mars','avril','mai','juin','juillet','aout','septembre','octobre','novembre','decembre'];
+const norm = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+function localAnswer(msg) {
+  const low = norm(msg), d = new Date();
+  if (/quelle heure|l'heure (est|qu)|il est quelle heure|heure actuelle/.test(low))
+    return `Il est ${d.getHours()} heure${d.getHours() > 1 ? 's' : ''}${d.getMinutes() ? ' ' + String(d.getMinutes()).padStart(2,'0') : ' pile'}.`;
+  if (/quel jour|quelle est la date|la date (d'aujourd|du jour)|on est quel jour|quel est le jour/.test(low))
+    return `Nous sommes le ${JOURS[d.getDay()]} ${d.getDate()} ${MOIS[d.getMonth()]} ${d.getFullYear()}.`;
+  return null;
+}
+
+// ===== Balises ORB / MEM =====
+function applyTags(reply) {
+  const mem = reply.match(/\[MEM:([^\]]+)\]/);
+  if (mem) {
+    memo.push(mem[1].trim()); memo = memo.slice(-50);
+    localStorage.setItem('jarvis_memo', JSON.stringify(memo));
+  }
+  return reply.replace(/\[(ORB|MEM):[^\]]*\]/g, '').trim();
+}
+
+// ===== Gemini =====
+async function ask(text) {
+  const local = localAnswer(text);
+  if (local) { add('jarvis', 'JARVIS: ' + local); say(local); return; }
+  if (!cfg.apiKey) { add('err', "Ajoute ta cle API dans REGLAGES."); return; }
+  busy = true; setStatus('REFLEXION', 'var(--orange)');
+  let sys = SYSTEM_PROMPT;
+  if (memo.length) sys += "\n\nNotes de memoire a long terme, dites par Monsieur : " + memo.join(' ; ') + ".";
+  history.push({ role:'user', parts:[{text}] });
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${cfg.model || 'gemini-2.0-flash'}:generateContent?key=${encodeURIComponent(cfg.apiKey)}`;
+  try {
+    const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ systemInstruction:{parts:[{text:sys}]}, contents: history.slice(-40) }) });
+    const data = await r.json();
+    if (!r.ok) throw new Error((data.error && data.error.message) || ('erreur ' + r.status));
+    const raw = data.candidates[0].content.parts[0].text.trim();
+    history.push({ role:'model', parts:[{text:raw}] });
+    localStorage.setItem('jarvis_hist', JSON.stringify(history.slice(-40)));
+    const clean = applyTags(raw);
+    add('jarvis', 'JARVIS: ' + clean); say(clean);
+  } catch (e) {
+    history.pop(); add('err', 'Erreur: ' + e.message);
+  } finally {
+    busy = false; setStatus(locked ? 'LOCKED' : 'UNLOCKED', locked ? 'var(--red)' : 'var(--green)');
+  }
+}
+
+function setStatus(txt, color) { $('status').textContent = txt; $('status').style.color = color; }
+
+function send() {
+  const text = $('msg').value.trim();
+  if (!text || busy) return;
+  $('msg').value = '';
+  if (text.toLowerCase() === '/reset') { newConv(); return; }
+  add('you', 'Toi: ' + text);
+  if (scheduleReminder(text)) return;
+  ask(text);
+}
+$('btnSend').onclick = send;
+$('msg').addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
+
+// ===== MIC (reconnaissance vocale du telephone) =====
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null;
+function micMsg(t) { $('micLbl').textContent = t; }
+async function startListen() {
+  if (!SR) { micMsg("Micro non disponible : ouvre la page avec Chrome."); return; }
+  if (listening) return;
+  try {
+    const st = await navigator.mediaDevices.getUserMedia({ audio: true });
+    st.getTracks().forEach(t => t.stop());
+  } catch (e) {
+    micMsg("Micro refuse : autorise le micro pour cette page dans Chrome."); return;
+  }
+  rec = new SR(); rec.lang = 'fr-FR'; rec.interimResults = false; rec.maxAlternatives = 1;
+  rec.onstart = () => { listening = true; micMsg("MICRO ACTIF : parle..."); };
+  rec.onresult = e => { const txt = e.results[0][0].transcript; micMsg(""); $('msg').value = txt; send(); };
+  rec.onerror = e => { listening = false; micMsg("Erreur micro : " + e.error + (e.error === 'network' ? " (Chrome a besoin d'Internet pour la voix)" : "")); };
+  rec.onend = () => { listening = false; if ($('micLbl').textContent.indexOf('ACTIF') >= 0) micMsg(""); };
+  try { rec.start(); } catch (e) { listening = false; micMsg("Micro indisponible : " + e.message); }
+}
+$('btnMic').onclick = startListen;
+
+// ===== Boutons =====
+$('btnMem').onclick = () => {
+  add('info', memo.length ? 'Memoire :\n- ' + memo.join('\n- ') : 'Memoire vide.');
+};
+$('btnConv').onclick = () => {
+  convMode = !convMode; $('btnConv').style.background = convMode ? 'var(--green)' : 'var(--orange)';
+  add('info', 'Mode conversation ' + (convMode ? 'active' : 'desactive') + '.');
+  if (convMode) startListen();
+};
+$('btnLock').onclick = () => { locked = true; $('lock').style.display = 'flex'; setStatus('LOCKED', 'var(--red)'); $('lockPin').value = ''; $('lockPin').focus(); };
+function unlock() {
+  const pin = cfg.pin || '';
+  if (pin && $('lockPin').value !== pin) { $('lockInfo').textContent = 'PIN incorrect.'; $('lockInfo').style.color = 'var(--red)'; return; }
+  locked = false; $('lock').style.display = 'none'; setStatus('UNLOCKED', 'var(--green)');
+  $('lockInfo').textContent = 'Entre le code PIN pour continuer.'; $('lockInfo').style.color = '';
+}
+$('btnUnlock').onclick = unlock;
+$('lockPin').addEventListener('keydown', e => { if (e.key === 'Enter') unlock(); });
+
+let shareStream = null;
+$('btnShare').onclick = async () => {
+  if (shareStream) {
+    shareStream.getTracks().forEach(t => t.stop()); shareStream = null;
+    $('shareVid').srcObject = null; $('shareVid').style.display = 'none';
+    $('btnShare').textContent = 'STREAM ECRAN: OFF'; $('shareLbl').textContent = ''; return;
+  }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+    $('shareLbl').textContent = "Partage d'ecran non disponible sur ce telephone/navigateur.";
+    $('shareLbl').style.color = 'var(--orange)'; return;
+  }
+  try {
+    shareStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+    shareStream.getVideoTracks()[0].onended = () => $('btnShare').click();
+    $('shareVid').srcObject = shareStream; $('shareVid').style.display = 'block'; await $('shareVid').play();
+    $('btnShare').textContent = 'STREAM ECRAN: ON'; $('shareLbl').textContent = ''; 
+  } catch (e) {
+    shareStream = null;
+    $('shareLbl').textContent = "Partage refuse ou impossible : " + e.name; $('shareLbl').style.color = 'var(--red)';
+  }
+};
+let camStream = null, streamTimer = null;
+$('btnCam').onclick = async () => {
+  if (camStream) {
+    camStream.getTracks().forEach(t => t.stop()); camStream = null; $('cam').srcObject = null;
+    $('btnCam').textContent = 'CAMERA: OFF'; return;
+  }
+  try {
+    camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+    $('cam').srcObject = camStream; await $('cam').play();
+    $('btnCam').textContent = 'CAMERA: ON';
+  } catch (e) {
+    camStream = null;
+    add('err', 'Camera impossible : ' + e.name + ' (autorise la camera dans Chrome).');
+  }
+};
+
+// ===== Reglages =====
+$('btnGear').onclick = () => {
+  $('sKey').value = cfg.apiKey || ''; $('sModel').value = cfg.model || 'gemini-2.0-flash'; $('sPin').value = cfg.pin || '';
+  $('settings').style.display = 'flex';
+};
+$('btnClose').onclick = () => $('settings').style.display = 'none';
+$('btnSave').onclick = () => {
+  cfg = { apiKey: $('sKey').value.trim(), model: $('sModel').value.trim() || 'gemini-2.0-flash', pin: $('sPin').value.trim() };
+  localStorage.setItem('jarvis_cfg', JSON.stringify(cfg));
+  $('settings').style.display = 'none'; add('info', 'Reglages enregistres.');
+};
+
+// ===== Infos systeme (sysinfo) =====
+function tick() {
+  const d = new Date();
+  $('sysinfo').textContent = 'HEURE  ' + d.toLocaleTimeString('fr-FR') + '\nRESEAU  ' + (navigator.onLine ? 'EN LIGNE' : 'HORS LIGNE');
+}
+setInterval(tick, 1000); tick();
+
+// ===== Orbe : memes anneaux et couleurs que le PC =====
+const cv = $('orb'), ctx = cv.getContext('2d');
+const RINGS = [[16, 95], [24, 120], [32, 145]];
+const DOTS = [];
+RINGS.forEach(([n, r]) => { for (let i = 0; i < n; i++) DOTS.push({ angle: 2*Math.PI*i/n, base: r, phase: (i*0.37) }); });
+function drawOrb() {
+  t += 1;
+  const target = (speaking || busy) ? 1 : 0;
+  spread += (target - spread) * 0.12;
+  const speed = (speaking || busy) ? 0.45 : 0.03;
+  const amp = 4 + 28 * spread;
+  const cx = cv.width/2, cy = cv.height/2;
+  const hearing = listening || convMode;
+  const color = hearing ? '#7df0ff' : (locked ? '#0088ff' : '#00ff41');
+  ctx.fillStyle = '#050a1a'; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.fillStyle = color; ctx.beginPath(); ctx.arc(cx, cy, 60, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#00d4ff';
+  for (const d of DOTS) {
+    const r = (d.base + 12*spread) + amp * Math.sin(t*speed + d.phase);
+    ctx.beginPath(); ctx.arc(cx + r*Math.cos(d.angle), cy + r*Math.sin(d.angle), 3, 0, Math.PI*2); ctx.fill();
+  }
+  requestAnimationFrame(drawOrb);
+}
+drawOrb();
+
+// ===== Historique des conversations =====
+let convs = JSON.parse(localStorage.getItem('jarvis_convs') || '[]');
+let curConv = { id: Date.now(), title: '', msgs: [] };
+function saveConv() {
+  if (!curConv.msgs.length) return;
+  const copy = { id: curConv.id, title: curConv.title || 'Conversation',
+                 date: new Date(curConv.id).toLocaleString('fr-FR'), msgs: curConv.msgs.slice(-200) };
+  const i = convs.findIndex(c => c.id === curConv.id);
+  if (i >= 0) convs[i] = copy; else convs.unshift(copy);
+  convs = convs.slice(0, 50);
+  localStorage.setItem('jarvis_convs', JSON.stringify(convs));
+}
+function newConv() {
+  saveConv(); history = []; localStorage.removeItem('jarvis_hist');
+  curConv = { id: Date.now(), title: '', msgs: [] }; $('chat').innerHTML = '';
+  renderMsg('info', 'Nouvelle conversation.');
+}
+function openConv(id) {
+  const c = convs.find(x => x.id === id); if (!c) return;
+  saveConv(); curConv = { id: c.id, title: c.title, msgs: c.msgs.slice() };
+  $('chat').innerHTML = ''; c.msgs.forEach(m => renderMsg(m.cls, m.text));
+  history = c.msgs.filter(m => m.cls === 'you' || m.cls === 'jarvis').map(m => ({
+    role: m.cls === 'you' ? 'user' : 'model', parts: [{ text: m.text.replace(/^(Toi|JARVIS): /, '') }] }));
+  localStorage.setItem('jarvis_hist', JSON.stringify(history));
+  $('histModal').style.display = 'none';
+}
+function showHistory() {
+  const list = $('histList'); list.innerHTML = '';
+  if (!convs.length) list.textContent = 'Aucune conversation sauvegardee.';
+  convs.forEach(c => {
+    const row = document.createElement('div'); row.style.cssText = 'margin:6px 0;display:flex;gap:6px';
+    const b = document.createElement('button'); b.className = 'btn';
+    b.style.cssText = 'background:var(--blue2);text-align:left;flex:1';
+    b.textContent = c.title + ' (' + c.date + ')'; b.onclick = () => openConv(c.id);
+    const d = document.createElement('button'); d.className = 'btn';
+    d.style.background = 'var(--red)'; d.textContent = 'X';
+    d.onclick = () => { convs = convs.filter(x => x.id !== c.id); localStorage.setItem('jarvis_convs', JSON.stringify(convs)); showHistory(); };
+    row.appendChild(b); row.appendChild(d); list.appendChild(row);
+  });
+  $('histModal').style.display = 'flex';
+}
+$('btnHist').onclick = showHistory;
+$('btnHistClose').onclick = () => $('histModal').style.display = 'none';
+
+// ===== Rappels (notification) =====
+// Limite : le rappel part seulement si la page JARVIS reste ouverte (pas en arriere-plan / fermee).
+function scheduleReminder(text) {
+  const m = norm(text).match(/rappelle[- ]?moi\s+(?:(dans)\s+(\d+)\s*(min|minute|minutes|h|heure|heures)|a\s+(\d{1,2})\s*h\s*(\d{0,2}))\s*(?:de|d'|que)?\s*(.+)$/);
+  if (!m) return false;
+  let delay;
+  if (m[1]) {
+    const n = parseInt(m[2], 10), unit = m[3];
+    delay = n * (unit.startsWith('h') ? 3600000 : 60000);
+  } else {
+    const now = new Date(), target = new Date();
+    target.setHours(parseInt(m[4], 10), parseInt(m[5] || '0', 10), 0, 0);
+    if (target <= now) target.setDate(target.getDate() + 1);
+    delay = target - now;
+  }
+  const body = m[6].trim();
+  const when = new Date(Date.now() + delay).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  setTimeout(() => {
+    add('jarvis', 'JARVIS: Rappel, Monsieur : ' + body); say('Rappel, Monsieur : ' + body);
+    if ('Notification' in window && Notification.permission === 'granted')
+      new Notification('JARVIS - Rappel', { body });
+  }, delay);
+  add('jarvis', 'JARVIS: Entendu, je vous rappellerai a ' + when + ' : ' + body + '.');
+  say('Entendu, je vous rappellerai a ' + when + '.');
+  if ('Notification' in window && Notification.permission !== 'granted')
+    add('info', 'Active les notifications (bouton ACTIVER LES NOTIFICATIONS) pour recevoir le rappel hors de la page.');
+  return true;
+}
+$('btnNotif').onclick = async () => {
+  if (!('Notification' in window)) { add('err', 'Notifications non disponibles sur ce navigateur.'); return; }
+  const p = await Notification.requestPermission();
+  add('info', p === 'granted' ? 'Notifications activees.' : 'Notifications refusees.');
+};
+
+// ===== Demarrage =====
+add('info', "JARVIS en ligne, Monsieur. Ajoute ta cle API dans REGLAGES.");
+setStatus('LOCKED', 'var(--red)');
+$('lock').style.display = 'flex';
+if (!cfg.pin) { locked = false; $('lock').style.display = 'none'; setStatus('UNLOCKED', 'var(--green)'); }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<script type="module">
+  import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+  let hl = null;
+  (async () => {
+    try {
+      const fs = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+      hl = await HandLandmarker.createFromOptions(fs, {
+        baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task" },
+        runningMode: "VIDEO", numHands: 2
+      });
+      window.handsReady = true;
+    } catch (e) { window.handsError = e.message || String(e); }
+  })();
+  window.countHands = (video) => hl ? hl.detectForVideo(video, performance.now()).landmarks.length : -1;
+</script>
+<script>
+// ===== Visage (face-api.js) et mains (MediaPipe) =====
+const FACE_MODELS = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
+let faceReady = false, faceLoop = null, faceBusy = false, enrolling = false;
+let faceDescs = JSON.parse(localStorage.getItem('jarvis_face') || '[]');
+
+async function loadFace() {
+  if (faceReady) return true;
+  if (typeof faceapi === 'undefined') { add('err', 'Bibliotheque visage non chargee (verifie Internet).'); return false; }
+  try {
+    await Promise.all([
+      faceapi.nets.tinyFaceDetector.loadFromUri(FACE_MODELS),
+      faceapi.nets.faceLandmark68Net.loadFromUri(FACE_MODELS),
+      faceapi.nets.faceRecognitionNet.loadFromUri(FACE_MODELS)
+    ]);
+    faceReady = true; return true;
+  } catch (e) { add('err', 'Modeles visage indisponibles : ' + e.message); return false; }
+}
+async function faceOnce() {
+  const v = $('cam');
+  if (!v.videoWidth) return null;
+  const det = await faceapi.detectSingleFace(v, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 }))
+    .withFaceLandmarks().withFaceDescriptor();
+  return det ? Array.from(det.descriptor) : 'none';
+}
+function matchOwner(desc) {
+  if (!faceDescs.length) return null;
+  let best = Infinity;
+  for (const d of faceDescs) best = Math.min(best, faceapi.euclideanDistance(desc, d));
+  return best < 0.5;
+}
+async function faceTick() {
+  if (!camStream || enrolling) return;
+  const r = await faceOnce();
+  if (r === null) return;
+  if (r === 'none') { $('faceLbl').textContent = 'Visage: aucun'; return; }
+  const ok = matchOwner(r);
+  if (ok === null) { $('faceLbl').textContent = 'Visage: pas encore enrole'; return; }
+  if (ok) {
+    $('faceLbl').textContent = 'Visage: proprietaire reconnu';
+    if (locked) {
+      locked = false; $('lock').style.display = 'none'; setStatus('UNLOCKED', 'var(--green)');
+      add('info', 'Visage reconnu, Monsieur. JARVIS est deverrouille.');
+    }
+  } else { $('faceLbl').textContent = 'Visage: inconnu'; }
+}
+function startFaceLoop() {
+  if (faceLoop) return;
+  faceLoop = setInterval(async () => {
+    if (faceBusy) return; faceBusy = true;
+    try { await faceTick(); } catch (e) {} finally { faceBusy = false; }
+  }, 900);
+  // mains : compte les mains visibles
+  window.handLoop = setInterval(() => {
+    if (!camStream || !window.countHands) return;
+    const v = $('cam'); if (!v.videoWidth) return;
+    const n = window.countHands(v);
+    $('handLbl').textContent = n < 0 ? 'Main: chargement...' : (n === 0 ? 'Main: aucune' : 'Main: ' + n + ' detectee(s)');
+  }, 300);
+}
+function stopFaceLoop() {
+  if (faceLoop) { clearInterval(faceLoop); faceLoop = null; }
+  if (window.handLoop) { clearInterval(window.handLoop); window.handLoop = null; }
+  $('faceLbl').textContent = 'Visage: -'; $('handLbl').textContent = 'Main: -';
+}
+// Le bouton camera demarre/arrete aussi la reconnaissance
+const origCam = $('btnCam').onclick;
+$('btnCam').onclick = async () => {
+  await origCam();
+  if (camStream) { if (await loadFace()) startFaceLoop(); } else stopFaceLoop();
+};
+// Enrolement : 5 prises du visage du proprietaire
+$('btnEnroll').onclick = async () => {
+  if (!camStream) { add('info', 'Active la camera d abord.'); return; }
+  if (!await loadFace()) return;
+  enrolling = true; const got = [];
+  add('info', 'Enrolement : regarde la camera, bouge doucement la tete...');
+  for (let i = 0; i < 10 && got.length < 5; i++) {
+    await new Promise(r => setTimeout(r, 700));
+    const d = await faceOnce(); if (d && d !== 'none') got.push(d);
+  }
+  enrolling = false;
+  if (got.length < 3) { add('err', 'Visage pas assez detecte. Reessaie face a la camera, bien eclaire.'); return; }
+  faceDescs = got; localStorage.setItem('jarvis_face', JSON.stringify(got));
+  add('info', 'Visage enregistre (' + got.length + ' prises). Seul ce visage pourra deverrouiller JARVIS.');
+};
+</script>
+</body>
+</html>
